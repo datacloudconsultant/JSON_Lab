@@ -1,0 +1,106 @@
+///***  CREATE DATABASE,SCHEMA
+
+CREATE OR REPLACE DATABASE TRAINING;
+USE SCHEMA TRAINING.public;
+
+///*** CREATE WAREHOUSE
+CREATE OR REPLACE WAREHOUSE TRAINING_WH WITH
+  WAREHOUSE_SIZE='X-SMALL'
+  AUTO_SUSPEND = 120
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED=TRUE;
+
+///*** USE WAREHOUSE
+USE WAREHOUSE TRAINING_WH;
+
+///*** CREATE TABLE with VARIANT Column to COPY JSON Data ( Semi strcuture Data File)
+CREATE OR REPLACE TABLE JSON_TABLE_Emp (
+  json_col_people VARIANT);
+
+///*** Query Table
+SELECT * FROM JSON_TABLE_Emp;
+
+///*** CREATE INTERNAL STAGE
+CREATE OR REPLACE STAGE json_stage;
+
+///*** Copy Data Into the Snowflake Target Table
+///*** Steps:  COPY JSON File from S3  OR UPLOAD  JSON File  from Local 
+
+///*** Check if any Files in Stage
+LIST @json_stage;
+
+SELECT * FROM JSON_TABLE_Emp;
+
+///*** How do you create a file format for JSON data in Snowflake
+CREATE FILE FORMAT json_format
+TYPE = 'JSON';
+SHOW FILE FORMATS;
+
+
+///*** How do you load JSON data into Snowflake tables?
+///*** COPY File from Internal Stage to Snowflake Table
+COPY INTO JSON_TABLE_Emp
+  FROM @json_stage/sample4.json
+  FILE_FORMAT = (TYPE = json);
+
+///*** Query JSON Table
+SELECT * FROM JSON_TABLE_Emp;
+
+ SELECT json_col_people:people
+  FROM JSON_TABLE_Emp;
+
+///*** Query Column Value-  #Age
+    SELECT
+  value:age::number as Age
+  FROM
+    JSON_TABLE_Emp
+  , LATERAL FLATTEN( INPUT => json_col_people:people );
+
+
+  //Query specific fields from a JSON object in Snowflake
+   // Ex: Query Column Value-  #First Name and #Age
+
+  
+  SELECT
+  value:firstName::string as First_Name,
+  value:age::number as Age
+  FROM
+    JSON_TABLE_Emp
+  , LATERAL FLATTEN( INPUT => json_col_people:people );
+
+///The FLATTEN function allows you to parse JSON data into separate columns
+//The Complete Data in Structured Format
+
+  SELECT f.value:firstName::string AS first_name,
+    f.value:lastName::string AS last_name,
+    f.value:age::integer AS age,
+    f.value:gender::string AS gender,
+    f.value:number::string AS phone_number
+FROM
+    JSON_TABLE_Emp,
+    LATERAL FLATTEN( INPUT => json_col_people:people ) f;
+
+
+//CREATE Strcutrued TABLE to store Data in  table:
+CREATE OR REPLACE TABLE flattened_json AS
+  SELECT f.value:firstName::string AS first_name,
+    f.value:lastName::string AS last_name,
+    f.value:age::integer AS age,
+    f.value:gender::string AS gender,
+    f.value:number::string AS phone_number
+FROM
+   JSON_TABLE_Emp,
+    LATERAL FLATTEN( INPUT => json_col_people:people ) f;
+
+//Query TABLE;
+select * from FLATTENED_JSON;
+
+
+
+
+
+
+
+
+
+
